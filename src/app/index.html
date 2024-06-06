@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="style.css">
+	<title>Document</title>
+</head>
+<body>
+	<div id="navbar">
+
+		<div class="nav-item" id="playlists-nav">
+			<h1>Playlists</h1>
+			<div class="item">
+				<button onclick="_ytm.sendData('refresh_playlists')">Server Refresh</button>
+				<div class="item-list" id="playlists"></div>
+			</div>
+		</div>
+	</div>
+	<div id="playing-view">
+		<div id="player-info">
+			<div id="player-info-title"></div>
+			<div id="player-info-artist"></div>
+		</div>
+		<div id="player-controls">
+			<button id="prev">Prev</button>
+			<button id="play" onclick="playPause(this)">Pause</button>
+			<button id="next">Next</button>
+		</div>
+		<div id="progress">
+			<input type="range" id="player-progress">
+			<div id="player-time"></div>
+		</div>
+		<div id="playlist-view-title"></div>
+	</div>
+	<div id="main-app">
+		<div id="title"><h1>Select Playlist</h1></div>
+		<div id="songs-in-playlist"></div>
+	</div>
+	<script src="app.js"></script>
+	<script>
+		document.querySelector('#navbar').addEventListener('click', function(e) {
+			if (e.target.tagName === 'H1') {
+				e.target.nextElementSibling.classList.toggle('expanded-view');
+			}
+		});
+	</script>
+</body>
+</html>

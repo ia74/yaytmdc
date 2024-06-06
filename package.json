@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "@googleapis/youtube": "^16.1.0",
+    "@xhayper/discord-rpc": "^1.1.2",
+    "dotenv": "^16.4.5",
+    "electron": "^30.0.9",
+    "googleapis": "^137.1.0",
+    "sound-play": "^1.1.0",
+    "ws": "^8.17.0",
+    "youtube-dl-exec": "^3.0.2"
+  },
+  "name": "yaytmdc",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
