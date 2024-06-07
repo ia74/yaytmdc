@@ -1,0 +1,33 @@
+<textarea type="text" id="search-input"></textarea>
+<div id="search-results"></div>
+<script type="module">
+	import { _ytm, createItemView } from './app.js';
+	import Fuse from 'https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.mjs'
+
+	let fuseOptions = {
+		keys: [
+			'snippet.title',
+			'snippet.videoOwnerChannelTitle'
+		]
+	}
+
+	let findSong = (query) => {
+		let _fuse = new Fuse(_ytm.playlistData, fuseOptions);
+		return _fuse.search(query);
+	}
+
+	
+	let onSearchInputChanged = (e) => {
+		let query = e.target.value;
+		let results = findSong(query);
+		console.log(query, results)
+		let searchResults = document.getElementById('search-results');
+		searchResults.innerHTML = '';
+		results.forEach(result => {
+			console.log(result)
+			let itemView = createItemView(result.item);
+			searchResults.appendChild(itemView);
+		});
+		}
+	document.getElementById('search-input').addEventListener('input', onSearchInputChanged);
+</script>

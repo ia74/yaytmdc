@@ -5,7 +5,7 @@ body {
 	margin: 0;
 	padding: 0;
 	display: flex;
-	flex-direction: row;
+	flex-direction: column;
 }
 
 .playlist img {
@@ -42,44 +42,51 @@ body {
 }
 
 #navbar {
-	position: fixed;
-	top: 0;
-	width: 100%;
-	padding: 10px;
+	/* position: relative; */
+	/* top: 0; */
+	width: 75%;
 	height: 50px;
 	display: flex;
-	justify-content: space-between;
+	justify-content: space-evenly;
+	align-items: center;
 	flex-direction: row;
 	background-color: #333;
 }
 
-#main-app {
-	margin-top: 75px;
-	width: 100%;
+#player-controls{
 	display: flex;
 	flex-direction: row;
+	gap: 10px;
 }
 
-.expanded-view {
-	display: grid;
-	grid-template-columns: 1fr 1fr 1fr;
-	grid-gap: 10px;
-	margin: 10px;
+#main-app {
+	width: 75%;
+	overflow-y: scroll;
+	margin-bottom: 50px;
+	display: flex;
+	flex-direction: column;
+}
+#engine-handler {
+	position: fixed;
+	top: 0;
+	right: 0;
+	width: 25%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 0.5);
 }
 
 .nav-item {
 	display: flex;
 	flex-direction: row;
+	background-color: #222;
+	border-radius: 5px;
+	padding: 10px;
+	cursor: pointer;
 }
 
 .item {
-	display: grid;
-	grid-template-columns: 1fr 1fr 1fr;
-	grid-gap: 10px;
-	margin: 10px;
 	background-color: #444;
 	border-radius: 5px;
-	padding: 10px;
 	white-space: pre-wrap;
 	text-overflow: ellipsis;
 }
@@ -94,13 +101,6 @@ body {
 	background-color: #333;
 	border-radius: 5px;
 	padding: 10px;
-}
-
-.item:has(.expanded-view) {
-	display: grid;
-	grid-template-columns: 1fr 1fr 1fr;
-	grid-gap: 10px;
-	margin: 10px;
 }
 
 .item:not(.expanded-view) {

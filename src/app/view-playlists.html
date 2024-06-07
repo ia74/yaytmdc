@@ -1,0 +1,58 @@
+<div id="playlists"></div>
+
+<script type="module">
+	import { _ytm, createItemView } from './app.js';
+	let _userData = {
+		playlists: [],
+	}
+	let lastPlaylist = null;
+
+	let loadPlaylistView = (playlist) => {
+		lastPlaylist = playlist;
+		document.getElementById('title').innerHTML = '<h1>Fetching songs for ' + playlist.snippet.title + '</h1>';
+		_ytm.send('request_playlist_items', playlist.id);
+		_ytm.onceData('request_playlist_items', (playlistItems) => {
+			document.getElementById('title').innerHTML = '<h1>Playlist: ' + playlist.snippet.title + ' (Loading) </h1>';
+			let playlistView = document.getElementById('songs-in-playlist');
+			playlistView.innerHTML = '';
+			playlistItems = playlistItems[0];
+			_ytm.playlistData = [];
+			playlistItems.forEach(item => {
+				_ytm.playlistData.push(item);
+				let itemView = createItemView(item);
+				playlistView.appendChild(itemView);
+			});
+			document.getElementById('title').innerHTML = '<h1>Playlist: ' + playlist.snippet.title + '</h1>';
+		});
+	};
+
+	let createPlaylistView = (playlist) => {
+		let playlistView = document.createElement('div');
+		playlistView.classList.add('playlist');
+		playlistView.classList.add('item-list-item');
+		// truncate title
+		playlist.snippet.titleShort = playlist.snippet.title.length > 30 ? playlist.snippet.title.slice(0, 30) + '...' : playlist.snippet.title;
+		playlistView.innerHTML = `
+				<img src="${playlist.snippet.thumbnails.medium.url}" />
+				<h3>${playlist.snippet.titleShort}</h3>
+			`;
+		playlistView.addEventListener('click', () => {
+			document.getElementById('playlist-view-title').innerText = playlist.snippet.title;
+			loadPlaylistView(playlist);
+		});
+		return playlistView;
+	};
+
+	_ytm.onData('request_playlists', (playlists) => {
+		playlists = playlists[0];
+		_userData.playlists = playlists;
+		let playlistsView = document.getElementById('playlists');
+		playlists.forEach(playlist => {
+			let playlistView = createPlaylistView(playlist);
+			playlistsView.appendChild(playlistView);
+		});
+	});
+
+
+	_ytm.send('request_playlists');
+</script>

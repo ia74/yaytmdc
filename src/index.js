@@ -3,7 +3,6 @@ dotenv.config();
 
 const youtubeMusicApi = require('@googleapis/youtube');
 const {authenticate} = require('@google-cloud/local-auth');
-const sound = require("sound-play");
 
 const {Client} = require('@xhayper/discord-rpc');
 
@@ -15,6 +14,15 @@ let icReady = false;
 
 client.on("ready", () => {
     icReady = true;
+    client.user?.setActivity({
+        state: 'Not listening to anything yet!',
+        details: 'Yet Another YouTube Music Desktop Client',
+        largeImageKey: 'ytm',
+        largeImageText: 'Yet Another YouTube Music Desktop Client',
+        buttons: [
+            { label: 'YAYTMDC on GitHub', url: 'https://github.com/ia74/yaytmdc' }
+        ]
+    });
 });
 
 client.login();
@@ -29,8 +37,9 @@ const scopes = [
 	'https://www.googleapis.com/auth/youtube.force-ssl'
 ];
 
-const userPlaylists = [];
+let userPlaylists = [];
 let oauth2Client = new google.auth.OAuth2();
+
 
 const authenticateUser = async () => {
 	const keys = require(path.resolve('src/secrets/oauth2.keys.json'));
@@ -52,7 +61,27 @@ const authenticateUser = async () => {
         tokens = require(path.resolve('src/secrets/user.json'));
     } catch (error) {
         console.error('Error reading user.json:', error);
-        tokens = await getNewTokens(oauth2Client);
+        // now we need to authenticate the user
+
+        const authUrl = oauth2Client.generateAuthUrl({
+            access_type: 'offline',
+            scope: scopes
+        });
+
+        console.log('Authorize this app by visiting this url:', authUrl);
+
+        const code = await authenticate({
+            keyfilePath: path.resolve('src/secrets/oauth2.keys.json'),
+            scopes: scopes
+        });
+
+        tokens = code.credentials;
+
+        fs.writeFileSync(path.resolve('src/secrets/user.json'), JSON.stringify(tokens));
+
+        console.clear();
+        console.log('Successfully authorized. Restart the app to continue.')
+        process.exit(0);
     }
 
     if (!tokens) {
@@ -164,6 +193,8 @@ const reloadCommandMap = () => {
 const youtubedl = require('youtube-dl-exec')
 
 reloadCommandMap();
+let internalNowPlaying = null;
+
 server.on('connection', (socket) => {
 	socket.sendData = (data, ...args) => {
 		socket.send(JSON.stringify({data, args}));
@@ -173,8 +204,11 @@ server.on('connection', (socket) => {
 		if(commandMap.has(data)) {
 			commandMap.get(data)({client: socket, raw: message, data, args, globals, io: server});
 		}
-        if(data == 'refresh_playlists')
+        if(data == 'refresh_playlists') {
+            userPlaylists = [];
             fetchUserPlaylists();
+            socket.sendData('request_playlists', userPlaylists);
+        }
         if(data == 'exists')
             socket.sendData('exists', fs.existsSync(args[0]), args[0].split('src/app/music/')[1].split('.webm')[0]);
         if(data == 'play_song') {
@@ -194,6 +228,12 @@ server.on('connection', (socket) => {
                 socket.sendData('play_song', args[1].split('src/app/')[1]);
                 }).catch(console.error)
             });
+        }
+        if (data == 'set_now_playing') {
+            internalNowPlaying = args[0];
+        }
+        if(data == 'get_now_playing') {
+            socket.sendData('get_now_playing', internalNowPlaying);
         }
         if(data == 'set_activity') {
             const isPaused = args[4];
@@ -248,12 +288,13 @@ const globals = {
 	fetchPlaylistItems
 }
 
-app.whenReady().then(createWindow);
-
 const main = async () => {
     try {
         await authenticateUser();
         await fetchUserPlaylists();
+        if(app.isReady()) {
+            createWindow();
+        }
     } catch (error) {
         console.error('An error occurred:', error);
     }

@@ -3,13 +3,13 @@ const _ytm = {
 	_mq: [],
 	_internalSendLoop: () => {
 		setInterval(() => {
-			if(_ytm._mq.length > 0) {
+			if (_ytm._mq.length > 0) {
 				_ytm.sock.send(_ytm._mq.shift());
 			}
 		}, 1);
 	},
 	send: (data, ...args) => {
-		_ytm._mq.push(JSON.stringify({data, args}));
+		_ytm._mq.push(JSON.stringify({ data, args }));
 	},
 	on: (event, callback) => {
 		_ytm.sock.addEventListener(event, callback);
@@ -26,15 +26,16 @@ const _ytm = {
 	},
 	globalAudio: null,
 	nowPlaying: {},
+	queue: [],
+	playlistData: [],
 }
+import { load } from './viewEngine.js'
 
-
-const _userData = {
-	playlists: [],
-}
+load('home')
 
 _ytm.on('open', () => {
 	_ytm.send('set_client', 'com.yaytmdc', 'Yet Another YouTube Music Desktop Client');
+	_ytm.send('refresh_playlists');
 	_ytm.send('request_playlists');
 	_ytm._internalSendLoop();
 });
@@ -44,8 +45,8 @@ const viewSongDownloading = (item) => {
 	document.getElementById('player-info-artist').innerText = 'Please wait...';
 };
 
-const playPause = (ele) => {
-	if(_ytm.globalAudio.paused) {
+function playPause(ele) {
+	if (_ytm.globalAudio.paused) {
 		_ytm.globalAudio.play();
 		ele.innerText = 'Pause';
 	} else {
@@ -53,38 +54,38 @@ const playPause = (ele) => {
 		ele.innerText = 'Play';
 	}
 	ele.innerText = _ytm.globalAudio.paused ? 'Play' : 'Pause';
+	_ytm.send('set_now_playing', _ytm.nowPlaying);
 	actualSet(_ytm.globalAudio, _ytm.nowPlaying.snippet.title, _ytm.nowPlaying.snippet.videoOwnerChannelTitle, _ytm.globalAudio.duration, null);
 };
 
 function actualSet(audioObject, title, artist, duration, ev) {
-		console.log('Audioboejct', audioObject)
-		_ytm.send('set_activity', title, artist, duration, audioObject.currentTime, audioObject.paused);
-		audioObject.removeEventListener('play', ev);
+	console.log('Audioboejct', audioObject)
+	_ytm.send('set_activity', title, artist, duration, audioObject.currentTime, audioObject.paused);
+	audioObject.removeEventListener('play', ev);
 }
 
 const setNowPlaying = (title, artist, audioObject) => {
-    document.getElementById('player-info-title').innerText = title;
-    document.getElementById('player-info-artist').innerText = artist;
-    if(!audioObject.paused) {
-        audioObject.addEventListener('loadedmetadata', () => {
-            actualSet(audioObject, title, artist, audioObject.duration, null);
-        });
-        console.log('Already playing')
-        return;
-    } 
-    let ev = audioObject.addEventListener('play', () => {
-        audioObject.addEventListener('loadedmetadata', () => {
-            actualSet(audioObject, title, artist, audioObject.duration, ev);
-        });
-    });
+	document.getElementById('player-info-title').innerText = title;
+	document.getElementById('player-info-artist').innerText = artist;
+	if (!audioObject.paused) {
+		audioObject.addEventListener('loadedmetadata', () => {
+			actualSet(audioObject, title, artist, audioObject.duration, null);
+		});
+		console.log('Already playing')
+		return;
+	}
+	let ev = audioObject.addEventListener('play', () => {
+		audioObject.addEventListener('loadedmetadata', () => {
+			actualSet(audioObject, title, artist, audioObject.duration, ev);
+		});
+	});
 }
-let lastPlaylist = null;
 
 _ytm.onData('exists', (exists, file) => {
 	let temp = exists;
 	exists = temp[0];
 	file = temp[1];
-	if(exists) {
+	if (exists) {
 		document.querySelector(`.downloader[data-video="${file}"]`).classList.add('downloaded');
 	}
 });
@@ -109,35 +110,56 @@ const createItemView = (item) => {
 		});
 	});
 	itemView.addEventListener('click', (tar) => {
-		if(tar.target.classList.contains('downloader')) return;
-		_ytm.send('play_song', item.snippet.resourceId.videoId, 'src/app/music/' + item.snippet.title + '.webm');
-		viewSongDownloading(item);
-		_ytm.onceData('play_song', (strea) => {
-			if(_ytm.globalAudio) {
-				_ytm.globalAudio.pause();
-				_ytm.globalAudio.remove();
-				_ytm.globalAudio = null;
-			}
-			_ytm.send('grab_lyrics', item.snippet);
-			let audio = new Audio(strea);
-			if(strea == null)
-				audio = new Audio('music/' + item.snippet.title + '.webm');
-			_ytm.globalAudio = audio;
-			// When the audio starts playing or is paused
-			_ytm.globalAudio.onplay = _ytm.globalAudio.onpause = () => {
-				localStorage.setItem('audioSrc', _ytm.globalAudio.src);
-				localStorage.setItem('audioTime', _ytm.globalAudio.currentTime);
-				localStorage.setItem('audioPaused', _ytm.globalAudio.paused);
-				localStorage.setItem('plr-details', JSON.stringify({title: item.snippet.title, artist: item.snippet.videoOwnerChannelTitle}));
-				setNowPlaying(item.snippet.title, item.snippet.videoOwnerChannelTitle, _ytm.globalAudio);
-			};
-			_ytm.nowPlaying = item;
-			audio.play();
-			updateProgress();
-		});
+		if (tar.target.classList.contains('downloader')) return;
+		playSong(item)
 	});
 	return itemView;
 };
+
+const playSong = (item) => {
+	_ytm.send('play_song', item.snippet.resourceId.videoId, 'src/app/music/' + item.snippet.title + '.webm');
+	viewSongDownloading(item);
+	_ytm.onceData('play_song', (strea) => {
+		if (_ytm.globalAudio) {
+			_ytm.globalAudio.pause();
+			_ytm.globalAudio.remove();
+			_ytm.globalAudio = null;
+		}
+		_ytm.send('grab_lyrics', item.snippet);
+		let audio = new Audio(strea);
+		if (strea == null)
+			audio = new Audio('music/' + item.snippet.title + '.webm');
+		_ytm.globalAudio = audio;
+		_ytm.globalAudio.onplay = _ytm.globalAudio.onpause = () => {
+			localStorage.setItem('audioSrc', _ytm.globalAudio.src);
+			localStorage.setItem('audioTime', _ytm.globalAudio.currentTime);
+			localStorage.setItem('audioPaused', _ytm.globalAudio.paused);
+			localStorage.setItem('plr-details', JSON.stringify(item));
+			setNowPlaying(item.snippet.title, item.snippet.videoOwnerChannelTitle, _ytm.globalAudio);
+		};
+		_ytm.nowPlaying = item;
+		_ytm.send('set_now_playing', _ytm.nowPlaying);
+		audio.play();
+		updateProgress();
+	});
+	_ytm.queue = _ytm.playlistData.slice(_ytm.playlistData.indexOf(item) + 1);
+}
+
+let lastSong = null;
+const playNext = () => {
+	if (_ytm.queue.length > 0) {
+		lastSong = _ytm.nowPlaying;
+		const next = _ytm.queue.shift();
+		playSong(next);
+	}
+}
+
+const playPrev = () => {
+	if (lastSong) {
+		playSong(lastSong);
+	}
+}
+
 document.getElementById('player-progress').onchange = (e) => {
 	_ytm.globalAudio.currentTime = e.target.value;
 	updateProgress();
@@ -146,18 +168,18 @@ document.getElementById('player-progress').onchange = (e) => {
 
 const updateProgress = () => {
 	const progress = document.getElementById('player-progress');
-		progress.max = _ytm.globalAudio.duration;
-		progress.value = _ytm.globalAudio.currentTime;
-		// pad with zeros
-		let left = Math.floor(_ytm.globalAudio.duration / 60);
-		left = left < 10 ? '0' + left : left;
-		let right = Math.floor(_ytm.globalAudio.duration % 60);
-		right = right < 10 ? '0' + right : right;
-		let leftCurrent = Math.floor(_ytm.globalAudio.currentTime / 60);
-		leftCurrent = leftCurrent < 10 ? '0' + leftCurrent : leftCurrent;
-		let rightCurrent = Math.floor(_ytm.globalAudio.currentTime % 60);
-		rightCurrent = rightCurrent < 10 ? '0' + rightCurrent : rightCurrent;
-		document.getElementById('player-time').innerText = `${leftCurrent}:${rightCurrent}/${left}:${right}`;
+	progress.max = _ytm.globalAudio.duration;
+	progress.value = _ytm.globalAudio.currentTime;
+	// pad with zeros
+	let left = Math.floor(_ytm.globalAudio.duration / 60);
+	left = left < 10 ? '0' + left : left;
+	let right = Math.floor(_ytm.globalAudio.duration % 60);
+	right = right < 10 ? '0' + right : right;
+	let leftCurrent = Math.floor(_ytm.globalAudio.currentTime / 60);
+	leftCurrent = leftCurrent < 10 ? '0' + leftCurrent : leftCurrent;
+	let rightCurrent = Math.floor(_ytm.globalAudio.currentTime % 60);
+	rightCurrent = rightCurrent < 10 ? '0' + rightCurrent : rightCurrent;
+	document.getElementById('player-time').innerText = `${leftCurrent}:${rightCurrent}/${left}:${right}`;
 }
 
 _ytm.onData('grab_lyrics', (lyrics) => {
@@ -166,65 +188,35 @@ _ytm.onData('grab_lyrics', (lyrics) => {
 	console.log(lyrics)
 	lyrics = lyrics.filter(song => song.name.toLowerCase() === _ytm.nowPlaying.snippet.title.toLowerCase() && song.artistName === _ytm.nowPlaying.snippet.videoOwnerChannelTitle.split(' - Topic')[0].toLowerCase());
 	const lyricLoop = setInterval(() => {
-		if(lyrics.syncedLyrics) {
+		if (lyrics.syncedLyrics) {
 			console.log(lyrics[0].syncedLyrics);
 		}
 	}, 250);
 });
 
 
+const createQueue = () => {
+	if(_ytm.queue.length !== 0) return;
+	_ytm.queue = _ytm.playlistData.slice(_ytm.playlistData.indexOf(_ytm.nowPlaying) + 1);
+}
 
 setInterval(() => {
-	if(_ytm.globalAudio) updateProgress();
-},1000)
+	if (_ytm.globalAudio) updateProgress();
+	if(_ytm.queue.length === 0) {
+		document.getElementById('prev').style.display = 'none';
+		document.getElementById('next').style.display = 'none';
+	} else {
+		document.getElementById('prev').style.display = 'block';
+		document.getElementById('next').style.display = 'block';
+	}
+	createQueue();
+}, 1000)
 
-const loadPlaylistView = (playlist) => {
-	lastPlaylist = playlist;
-	document.getElementById('title').innerHTML = '<h1>Fetching songs for ' + playlist.snippet.title + '</h1>';
-	_ytm.send('request_playlist_items', playlist.id);
-	_ytm.onceData('request_playlist_items', (playlistItems) => {
-		document.getElementById('title').innerHTML = '<h1>Playlist: ' + playlist.snippet.title + ' (Loading) </h1>';
-		const playlistView = document.getElementById('songs-in-playlist');
-		playlistView.innerHTML = '';
-		playlistItems = playlistItems[0];
-		playlistItems.forEach(item => {
-			const itemView = createItemView(item);
-			playlistView.appendChild(itemView);
-			});
-		document.getElementById('title').innerHTML = '<h1>Playlist: ' + playlist.snippet.title + '</h1>';
-	});
-};
 
-const createPlaylistView = (playlist) => {
-	const playlistView = document.createElement('div');
-	playlistView.classList.add('playlist');
-	playlistView.classList.add('item-list-item');
-	// truncate title
-	playlist.snippet.titleShort = playlist.snippet.title.length > 30 ? playlist.snippet.title.slice(0, 30) + '...' : playlist.snippet.title;
-	playlistView.innerHTML = `
-		<img src="${playlist.snippet.thumbnails.medium.url}" />
-		<h3>${playlist.snippet.titleShort}</h3>
-	`;
-	playlistView.addEventListener('click', () => {
-		document.getElementById('playlist-view-title').innerText = playlist.snippet.title;
-		loadPlaylistView(playlist);
-	});
-	return playlistView;
-};
-
-_ytm.onData('request_playlists', (playlists) => {
-	playlists = playlists[0];
-	_userData.playlists = playlists;
-	const playlistsView = document.getElementById('playlists');
-	playlists.forEach(playlist => {
-		const playlistView = createPlaylistView(playlist);
-		playlistsView.appendChild(playlistView);
-	});
-});
 
 _ytm.on('message', (message) => {
-	const {data, args} = JSON.parse(message.data);
-	if(_ytm.dataCallbacks[data]) {
+	const { data, args } = JSON.parse(message.data);
+	if (_ytm.dataCallbacks[data]) {
 		_ytm.dataCallbacks[data](args);
 	}
 	console.log(`Received message: ${data} args ${args}`);
@@ -232,33 +224,47 @@ _ytm.on('message', (message) => {
 
 // When the page is loaded
 window.onload = () => {
-    const audioSrc = localStorage.getItem('audioSrc');
-    const audioTime = localStorage.getItem('audioTime');
-    const audioPaused = localStorage.getItem('audioPaused');
+	const audioSrc = localStorage.getItem('audioSrc');
+	const audioTime = localStorage.getItem('audioTime');
+	const audioPaused = localStorage.getItem('audioPaused');
 
-    if (audioSrc) {
+	if (audioSrc) {
 		_ytm.globalAudio = new Audio();
-        _ytm.globalAudio.src = audioSrc;
-        _ytm.globalAudio.currentTime = audioTime || 0;
-        if (audioPaused === 'false') {
-            _ytm.globalAudio.play();
-        }
+		_ytm.globalAudio.src = audioSrc;
+		_ytm.globalAudio.currentTime = audioTime || 0;
+		if (audioPaused === 'false') {
+			_ytm.globalAudio.play();
+		}
 		document.getElementById('play').innerText = _ytm.globalAudio.paused ? 'Play' : 'Pause';
-		const details = JSON.parse(localStorage.getItem('plr-details'));
-		if(details) {
-			setNowPlaying(details.title, details.artist, _ytm.globalAudio);
-			_ytm.nowPlaying = {snippet: {title: details.title, videoOwnerChannelTitle: details.artist}};
-			_ytm.send('grab_lyrics', {title: details.title, videoOwnerChannelTitle: details.artist});
+		const itm = JSON.parse(localStorage.getItem('plr-details'));
+		const details = itm.snippet;
+		if (details) {
+			setNowPlaying(details.title, details.videoOwnerChannelTitle, _ytm.globalAudio);
+			_ytm.nowPlaying = itm;
+			_ytm.send('grab_lyrics', details);
+			_ytm.send('set_now_playing', _ytm.nowPlaying);
 		}
 		updateProgress();
-    }
+	}
 };
 // When the page is about to be unloaded
 window.onbeforeunload = () => {
-    if (_ytm.globalAudio) {
-        localStorage.setItem('audioSrc', _ytm.globalAudio.src);
-        localStorage.setItem('audioTime', _ytm.globalAudio.currentTime);
-        localStorage.setItem('audioPaused', _ytm.globalAudio.paused);
-		localStorage.setItem('plr-details', JSON.stringify({title: document.getElementById('player-info-title').innerText, artist: document.getElementById('player-info-artist').innerText}));
-    }
+	if (_ytm.globalAudio) {
+		localStorage.setItem('audioSrc', _ytm.globalAudio.src);
+		localStorage.setItem('audioTime', _ytm.globalAudio.currentTime);
+		localStorage.setItem('audioPaused', _ytm.globalAudio.paused);
+		localStorage.setItem('plr-details', JSON.stringify(_ytm.nowPlaying));
+	}
 };
+
+window.playPause = playPause;
+
+window.playPrev = playPrev;
+window.playNext = playNext;
+
+window.YtmGlobApi = _ytm;
+export {
+	_ytm,
+	playPause,
+	createItemView
+}
