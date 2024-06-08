@@ -192,6 +192,7 @@ const reloadCommandMap = () => {
 
 const youtubedl = require('youtube-dl-exec')
 
+
 reloadCommandMap();
 let internalNowPlaying = null;
 
@@ -206,6 +207,7 @@ server.on('connection', (socket) => {
 		}
         if(data == 'refresh_playlists') {
             userPlaylists = [];
+            authenticateUser();
             fetchUserPlaylists();
             socket.sendData('request_playlists', userPlaylists);
         }
@@ -269,19 +271,7 @@ server.on('connection', (socket) => {
 	});
 });
 
-const { app, BrowserWindow } = require('electron');
 
-const createWindow = () => {
-	const win = new BrowserWindow({
-		width: 800,
-		height: 600,
-		webPreferences: {
-			nodeIntegration: true
-		}
-	});
-
-	win.loadFile(path.resolve('src/app/index.html'));
-}
 
 const globals = {
 	userPlaylists,
@@ -292,9 +282,8 @@ const main = async () => {
     try {
         await authenticateUser();
         await fetchUserPlaylists();
-        if(app.isReady()) {
-            createWindow();
-        }
+        require('./electron-runtime.js')
+
     } catch (error) {
         console.error('An error occurred:', error);
     }

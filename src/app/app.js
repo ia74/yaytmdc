@@ -33,6 +33,10 @@ import { load } from './viewEngine.js'
 
 load('home')
 
+const scrobbleLastFm = (token) => {
+	
+}
+
 _ytm.on('open', () => {
 	_ytm.send('set_client', 'com.yaytmdc', 'Yet Another YouTube Music Desktop Client');
 	_ytm.send('refresh_playlists');
@@ -131,6 +135,9 @@ const playSong = (item) => {
 			audio = new Audio('music/' + item.snippet.title + '.webm');
 		_ytm.globalAudio = audio;
 		_ytm.globalAudio.onplay = _ytm.globalAudio.onpause = () => {
+			if (_ytm.globalAudio.duration === _ytm.globalAudio.currentTime) {
+				playNext();
+			}
 			localStorage.setItem('audioSrc', _ytm.globalAudio.src);
 			localStorage.setItem('audioTime', _ytm.globalAudio.currentTime);
 			localStorage.setItem('audioPaused', _ytm.globalAudio.paused);
@@ -181,19 +188,6 @@ const updateProgress = () => {
 	rightCurrent = rightCurrent < 10 ? '0' + rightCurrent : rightCurrent;
 	document.getElementById('player-time').innerText = `${leftCurrent}:${rightCurrent}/${left}:${right}`;
 }
-
-_ytm.onData('grab_lyrics', (lyrics) => {
-	lyrics = lyrics[0];
-	// array of song objects, we need to find correct one
-	console.log(lyrics)
-	lyrics = lyrics.filter(song => song.name.toLowerCase() === _ytm.nowPlaying.snippet.title.toLowerCase() && song.artistName === _ytm.nowPlaying.snippet.videoOwnerChannelTitle.split(' - Topic')[0].toLowerCase());
-	const lyricLoop = setInterval(() => {
-		if (lyrics.syncedLyrics) {
-			console.log(lyrics[0].syncedLyrics);
-		}
-	}, 250);
-});
-
 
 const createQueue = () => {
 	if(_ytm.queue.length !== 0) return;

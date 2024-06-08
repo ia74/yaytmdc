@@ -73,6 +73,9 @@ body {
 	width: 25%;
 	height: 100%;
 	background-color: rgba(0, 0, 0, 0.5);
+	overflow-y: scroll;
+	scrollbar-width: none;
+	margin-bottom: 50px;
 }
 
 .nav-item {

@@ -7,6 +7,8 @@
 		<input type="range" id="stime-slider">
 		<div id="stotal"></div>
 	</div>
+	<div id="slyrics">
+	</div>
 </div>
 
 <style>
@@ -15,6 +17,14 @@
 		flex-direction: column;
 		align-items: center;
 	}
+
+	#home {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		margin-bottom: 50px;
+	}
+
 	#scover {
 		width: 200px;
 		height: 200px;
@@ -22,26 +32,63 @@
 		background-position: center;
 		margin: 20px;
 	}
+
 	#stitle {
 		font-size: 1.5em;
 	}
+
 	#sartist {
 		font-size: 1.2em;
 	}
+
 	#slen {
 		display: flex;
 		flex-direction: row;
 		align-items: center;
+	}
+
+	#selapsed,
+	#stotal {
+		font-size: 0.8em;
+	}
+
+	#stime-slider {
+		width: 100%;
+	}
+
+	#slyrics {
+		margin: 20px;
+		font-size: 1.2em;
+		text-align: center;
+		transition-duration: 0.5s;
+		overflow-y: scroll;
+		scrollbar-width: none;
+		scroll-behavior: smooth;
+	}
+
+	.past {
+		color: gray;
+	}
+
+	.current {
+		color: white;
+		font-weight: bold;
+	}
+
+	.future {
+		color: lightgray;
 	}
 </style>
 
 <script type="module">
 	import { _ytm } from './app.js';
 	let _nowPlaying = null;
+	let nowLyrics = null;
+	let lyricLoopG = null;
 	_ytm.send('get_now_playing');
 	setInterval(() => {
 		_ytm.send('get_now_playing');
-	},1000);
+	}, 1000);
 	_ytm.onData('get_now_playing', (songData) => {
 		_nowPlaying = songData[0];
 		update();
@@ -56,11 +103,102 @@
 			document.getElementById('stime-slider').value = _ytm.globalAudio.currentTime;
 			document.getElementById('stime-slider').oninput = (e) => {
 				_ytm.globalAudio.currentTime = e.target.value;
+				document.getElementById('slyrics').childNodes.forEach(lyricDiv => {
+					let lyricTimestamp = lyricDiv.dataset.timestamp;
+					lyricTimestamp = convertTimestamp(lyricTimestamp)
+					let ct = convertTimestamp(formatTimestamp(e.target.value))
+					if (lyricTimestamp < ct + 500) {
+						lyricDiv.className = 'past';
+					} else if (lyricTimestamp - ct) {
+						lyricDiv.className = 'current';
+					} else {
+						lyricDiv.className = 'future';
+					}
+				});
 			}
 			document.getElementById('selapsed').innerText = formatTimestamp(_ytm.globalAudio.currentTime);
 			document.getElementById('stotal').innerText = formatTimestamp(_ytm.globalAudio.duration);
 		}
 	}
+	_ytm.onData('grab_lyrics', (lyrics) => {
+		document.getElementById('slyrics').innerHTML = '';
+		lyrics = lyrics[0]
+		// array of song objects, we need to find correct one
+		lyrics = lyrics.filter(song => song.name.toLowerCase() === _ytm.nowPlaying.snippet.title.toLowerCase());
+		lyrics = lyrics[0];
+		if (lyricLoopG) {
+			clearInterval(lyricLoopG);
+		}
+		lyrics.syncedLyrics.split('\n').forEach(lyric => {
+			let lyricDiv = document.createElement('div');
+			if(lyric.split(']')[1].trim() == '')
+				lyric = ']<br>'
+			lyricDiv.innerHTML = lyric.split(']')[1];
+			lyricDiv.className = 'future';
+			lyricDiv.dataset.timestamp = lyric.split(']')[0].split('[')[1];
+			document.getElementById('slyrics').appendChild(lyricDiv);
+		});
+
+		const lyricLoop = setInterval(() => {
+			let currentTimestamp = formatTimestamp(_ytm.globalAudio.currentTime);
+			let currentLyric = getLyricForTimestamp(currentTimestamp, lyrics.syncedLyrics);
+			if (currentLyric !== lastLyric) {
+				lastLyric = currentLyric;
+				document.getElementById('slyrics').childNodes.forEach(lyricDiv => {
+					let lyricTimestamp = lyricDiv.dataset.timestamp;
+					lyricTimestamp = convertTimestamp(lyricTimestamp)
+					let ct = convertTimestamp(currentTimestamp)
+					if (lyricTimestamp <= ct && lyricTimestamp + 5 >= ct) { 
+						lyricDiv.className = 'current';
+						document.getElementById('slyrics').scrollTop = lyricDiv.offsetTop - 100;
+					} else if (lyricTimestamp < ct) {
+						lyricDiv.className = 'past';
+					}
+				});
+			}
+		}, 250);
+		lyricLoopG = lyricLoop;
+	});
+
+	let lastLyric = null;
+
+	const getNextLyric = (timestamp, lyrics) => {
+		let min = timestamp.split(':')[0];
+		let sec = timestamp.split(':')[1];
+		let time = parseInt(min) * 60 + parseInt(sec);
+		let lyricsArray = lyrics.split('\n');
+		let lyric = lyricsArray.find(lyric => {
+			let lyricTime = lyric.split(']')[0].split('[')[1];
+			let lyricMin = lyricTime.split(':')[0];
+			let lyricSec = lyricTime.split(':')[1];
+			lyricTime = parseInt(lyricMin) * 60 + parseInt(lyricSec);
+			return lyricTime > time + 2 && lyricTime < time + 5;
+		});
+		return lyric.split(']')[1];
+	}
+
+	const getLyricForTimestamp = (timestamp, lyrics) => {
+		let min = timestamp.split(':')[0];
+		let sec = timestamp.split(':')[1];
+		let time = parseInt(min) * 60 + parseInt(sec);
+		let lyricsArray = lyrics.split('\n');
+		let lyric = lyricsArray.find(lyric => {
+			let lyricTime = lyric.split(']')[0].split('[')[1];
+			let lyricMin = lyricTime.split(':')[0];
+			let lyricSec = lyricTime.split(':')[1];
+			let nlyricTime = parseInt(lyricMin) * 60 + parseInt(lyricSec);
+			return nlyricTime === time;
+		});
+		if (!lyric) return '';
+		return lyric.split(']')[1];
+	}
+
+	const convertTimestamp = (timestamp) => {
+		let min = timestamp.split(':')[0];
+		let sec = timestamp.split(':')[1];
+		return parseInt(min) * 60 + parseInt(sec);
+	}
+
 	const formatTimestamp = (timestamp) => {
 		let minutes = Math.floor(timestamp / 60);
 		let seconds = Math.floor(timestamp % 60);

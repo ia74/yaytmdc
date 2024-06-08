@@ -11,10 +11,10 @@ const getContextFor = (viewId) => {
 	return document.getElementById(viewId);
 }
 
-const _views = [];
+const _views = ['home'];
 
 const load = (view) => {
-	if(!_views.includes(view)) _views.push(view);
+	if (!_views.includes(view)) _views.push(view);
 	fetch(`./view-${view}.html`)
 		.then(response => {
 			return response.text();
@@ -25,22 +25,25 @@ const load = (view) => {
 				if (viewa !== view) {
 					context.style.display = 'none';
 				} else {
-					if(context) context.style.display = 'block';
+					if (context) context.style.display = 'block';
 				}
 			});
-			const context = createSeperateContext(view);
-			context.innerHTML = data;
+			let context = getContextFor(view);
+			if (!context) {
+				context = createSeperateContext(view);
+				context.innerHTML = data;
+			}
 
-			if(document.getElementById(view + '-script-0')) return;
-            const scripts = context.getElementsByTagName('script');
-            for (let i = 0; i < scripts.length; i++) {
-                const script = document.createElement('script');
+			if (document.getElementById(view + '-script-0')) return;
+			const scripts = context.getElementsByTagName('script');
+			for (let i = 0; i < scripts.length; i++) {
+				const script = document.createElement('script');
 				script.type = 'module'
 				script.id = view + '-script-' + i;
 				script.classList.add('ve-script');
-                script.text = scripts[i].text;
-                document.body.appendChild(script);
-            }
+				script.text = scripts[i].text;
+				document.body.appendChild(script);
+			}
 		})
 		.catch(error => {
 			console.error(error);
@@ -48,7 +51,7 @@ const load = (view) => {
 }
 
 const deload = () => {
-	
+
 }
 
 document.querySelectorAll('ViewRef').forEach((element) => {
